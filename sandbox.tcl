@@ -28,41 +28,50 @@ grid columnconfigure . 0 -weight 1
 ttk::style configure Green.TFrame -background green
 ttk::style configure Blue.TFrame -background blue
 
-ttk::frame .view.boxframe -style Green.TFrame
-ttk::frame .view.boxframe2 -style Blue.TFrame
-set box [.view.workspace create window 20 20 -width 80 -height 60\
-    -window .view.boxframe -tags "element" -anchor nw]
-set box2 [.view.workspace create window 20 120 -width 80 -height 60\
-    -window .view.boxframe2 -tags "element" -anchor nw]
+set gridsz 20
+set blockctr 0
+
+bind . <Leave> {setScrollRegion}
+
+proc createBlock {q style} {
+    set x [expr [lindex $q 0] * $::gridsz]
+    set y [expr [lindex $q 1] * $::gridsz]
+    set w [expr [lindex $q 2] * $::gridsz]
+    set h [expr [lindex $q 3] * $::gridsz]
+    set blockFrame [ttk::frame .view.$::blockctr -style $style]
+    set block [.view.workspace create window $x $y -width $w -height $h\
+        -window $blockFrame -tags "block" -anchor nw]
+
+    bind $blockFrame <1> "selectElement %X %Y; raise $blockFrame"
+    bind $blockFrame <B1-Motion> "moveElement $block %X %Y"
+    bind $blockFrame <B1-ButtonRelease> "dropElement $block"
+
+    incr ::blockctr
+}
 
 proc setScrollRegion {} {
-    set bbox [.view.workspace bbox "element"]
+    set bbox [.view.workspace bbox "block"]
     for {set i 0} {$i < 2} {incr i} {
-        lset bbox $i [expr [lindex $bbox $i] - 40]
-        lset bbox [expr $i + 2] [expr [lindex $bbox [expr $i + 2]] + 40]
+        set padding [expr 2 * $::gridsz]
+        lset bbox $i [expr [lindex $bbox $i] - $padding]
+        lset bbox [expr $i + 2] [expr [lindex $bbox [expr $i + 2]] + $padding]
     }
     .view.workspace configure -scrollregion $bbox
 }
 
+createBlock {0 0 4 3} Green.TFrame
+createBlock {0 4 4 3} Blue.TFrame
+
 setScrollRegion
 
-foreach boxMaterials {{$box .view.boxframe} {$box2 .view.boxframe2}} {
-    bind [lindex $boxMaterials 1] <1> "selectElement %X %Y; raise\
-        [lindex $boxMaterials 1]"
-    bind [lindex $boxMaterials 1] <B1-Motion> "moveElement\
-        [lindex $boxMaterials 0] %X %Y"
-    bind [lindex $boxMaterials 1] <B1-ButtonRelease> "dropElement\
-        [lindex $boxMaterials 0]"
-}
-
 proc selectElement {mx my} {
-    set ::x0 [.view.workspace canvasx $mx 20]
-    set ::y0 [.view.workspace canvasy $my 20]
+    set ::x0 [.view.workspace canvasx $mx $::gridsz]
+    set ::y0 [.view.workspace canvasy $my $::gridsz]
 }
 
 proc moveElement {element mx my} {
-    set x [.view.workspace canvasx $mx 20]
-    set y [.view.workspace canvasy $my 20]
+    set x [.view.workspace canvasx $mx $::gridsz]
+    set y [.view.workspace canvasy $my $::gridsz]
     .view.workspace move $element [expr $x - $::x0] [expr $y - $::y0]
     set ::x0 $x
     set ::y0 $y
