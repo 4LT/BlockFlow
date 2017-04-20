@@ -34,6 +34,9 @@ ttk::style configure Red.TFrame -background #d00000
 
 bind . <Leave> {updateScrollRegion .view.workspace}
 
-createBlock .view.workspace {0 0} {4 3} Green.TFrame
+set bset [createBlockSet .view.workspace]
+addBlock $bset "0 0" {4 3} Green.TFrame
+addBlock $bset "0 4" {4 3} Blue.TFrame
+addBlock $bset "5 0" {4 3} Magenta.TFrame
 
 updateScrollRegion .view.workspace
