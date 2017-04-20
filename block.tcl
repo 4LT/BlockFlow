@@ -74,6 +74,20 @@ namespace eval block {
         $workspace configure -scrollregion $bbox
     }
 
+    proc updateWindow {workspace block blockWin} {
+        variable gridsz
+
+        lassign [dict get $block pos] x y
+        lassign [dict get $block dim] w h
+        set pxX [expr $x * $gridsz]
+        set pxY [expr $y * $gridsz]
+        set pxW [expr $w * $gridsz]
+        set pxH [expr $h * $gridsz]
+        
+        $workspace coords $blockWin $pxX $pxY
+        $workspace itemconfigure $blockWin -width $pxW -height $pxH
+    }
+
     proc selectWindow {workspace mx my} {
         variable gridsz
         variable x0 [$workspace canvasx $mx $gridsz]\
@@ -94,21 +108,55 @@ namespace eval block {
         set y0 $y
     }
 
+    proc overlap {block1 block2} {
+        lassign [dict get $block1 pos] minX1 minY1
+        lassign [dict get $block1 dim] w h
+        set maxX1 [expr $minX1 + $w - 1]
+        set maxY1 [expr $minY1 + $h - 1]
+        lassign [dict get $block2 pos] minX2 minY2
+        lassign [dict get $block2 dim] w h
+        set maxX2 [expr $minX2 + $w - 1]
+        set maxY2 [expr $minY2 + $h - 1]
+
+        if {    $minX1 <= $maxX2 && $maxX1 >= $minX2 &&\
+                $minY1 <= $maxY2 && $maxY1 >= $minY2    } {
+            return 1
+        } else {
+            return 0
+        }
+    }
+
     proc dropWindow {setI blockI} {
         variable sets
         variable gridsz
 
         set blockSet [lindex $sets $setI]
-        set block [lindex [dict get $blockSet blocks]  $blockI]
+        set blocks [dict get $blockSet blocks]
+        set block [lindex $blocks  $blockI]
         set blockWin [dict get $block window]
         set workspace [dict get $blockSet ws]
         lassign [$workspace coords $blockWin] x y
         set newx [expr int($x / $gridsz)]; set newy [expr int($y / $gridsz)]
-        dict set block pos [list $newx $newy]
-        dict set blockSet blocks\
-            [lreplace [dict get $blockSet blocks] $blockI $blockI $block]
-        lset sets $setI $blockSet
+        set newBlock $block
+        dict set newBlock pos [list $newx $newy]
+
+        set overlap 0
+        for {set i 0} {$i < [llength $blocks]} {incr i} {
+            set otherBlock [lindex $blocks $i]
+            if {$i != $blockI && [overlap $newBlock $otherBlock]} {
+                set overlap 1
+                break
+            }
+        }
+
+        if {!$overlap} {
+            set block $newBlock
+            lset blocks $blockI $block
+            dict set blockSet blocks $blocks
+            lset sets $setI $blockSet
+        }
         
+        updateWindow $workspace $block $blockWin
         updateScrollRegion $workspace
     }
 }
