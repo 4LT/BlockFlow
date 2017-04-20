@@ -3,43 +3,45 @@ package require Tk
 namespace eval block {
     namespace export createBlockSet addBlock updateScrollRegion 
 
-    variable gridsz 20 blockctr 0
-    variable sets [list]
+    variable gridsz 20 blockctr 0 setctr 0
+    variable sets 
 
     proc createBlockSet {workspace} {
         variable sets
+        variable setctr
 
-        set blockSet [dict create ws $workspace]
+        set blockSpace [dict create ws $workspace]
         set wsParent [regsub {\.[^\.]*$} $workspace ""]
         if { "$wsParent" == "$workspace" || "$wsParent" == "" } {
             error "Workspace must have a non-root parent!"
         }
-        dict set blockSet wsParent $wsParent
-        dict set blockSet blocks [list]
-        lappend sets $blockSet
-        return [expr [llength sets] - 1]
+        dict set blockSpace wsParent $wsParent
+        dict set blockSpace blocks [dict create]
+        set sets($setctr) $blockSpace
+        incr setctr
+        return [expr $setctr - 1]
     }
 
     proc addBlock {setI pos dim style} {
         variable gridsz
         variable blockctr
         variable sets
-        set blockSet [lindex $sets $setI]
+        set blockSpace $sets($setI)
 
         set block [dict create\
                 pos     $pos\
                 dim     $dim\
                 style   $style]
 
-        set workspace [dict get $blockSet ws]
+        set workspace [dict get $blockSpace ws]
 
         set pxX [expr [lindex $pos 0] * $gridsz]
         set pxY [expr [lindex $pos 1] * $gridsz]
         set pxW [expr [lindex $dim 0] * $gridsz]
         set pxH [expr [lindex $dim 1] * $gridsz]
 
-        set blockFrame [ttk::frame [dict get $blockSet wsParent].block$blockctr\
-            -style $style]
+        set blockFrame [ttk::frame\
+            [dict get $blockSpace wsParent].block$blockctr -style $style]
         set blockWin [$workspace create window $pxX $pxY\
             -width $pxW -height $pxH -window $blockFrame -tags "block"\
             -anchor nw]
@@ -47,18 +49,17 @@ namespace eval block {
         dict set block frame $blockFrame
         dict set block window $blockWin
 
-        dict lappend blockSet blocks $block
-        set blockI [expr [llength [dict get $blockSet blocks]] - 1]
-        lset sets $setI $blockSet
+        dict set blockSpace blocks $blockctr $block
+        set sets($setI) $blockSpace
 
         bind $blockFrame <1> "block::selectWindow $workspace %X %Y;\
             raise $blockFrame"
         bind $blockFrame <B1-Motion> "block::moveWindow $workspace\
             $blockWin %X %Y"
-        bind $blockFrame <B1-ButtonRelease> "block::dropWindow $setI $blockI"
+        bind $blockFrame <B1-ButtonRelease> "block::dropWindow $setI $blockctr"
 
         incr blockctr
-        return $blockI
+        return [expr $blockctr - 1]
     }
 
     proc updateScrollRegion { workspace } {
@@ -130,20 +131,20 @@ namespace eval block {
         variable sets
         variable gridsz
 
-        set blockSet [lindex $sets $setI]
-        set blocks [dict get $blockSet blocks]
-        set block [lindex $blocks  $blockI]
+        set blockSpace $sets($setI)
+        set block [dict get $blockSpace blocks $blockI]
         set blockWin [dict get $block window]
-        set workspace [dict get $blockSet ws]
+        set workspace [dict get $blockSpace ws]
         lassign [$workspace coords $blockWin] x y
         set newx [expr int($x / $gridsz)]; set newy [expr int($y / $gridsz)]
         set newBlock $block
         dict set newBlock pos [list $newx $newy]
 
         set overlap 0
-        for {set i 0} {$i < [llength $blocks]} {incr i} {
-            set otherBlock [lindex $blocks $i]
-            if {$i != $blockI && [overlap $newBlock $otherBlock]} {
+        for {set i 0} {$i < [dict size [dict get $blockSpace blocks]]} {incr i}\
+        {
+            if {$i != $blockI && [overlap $newBlock\
+                    [dict get $blockSpace blocks $i]]} {
                 set overlap 1
                 break
             }
@@ -151,9 +152,8 @@ namespace eval block {
 
         if {!$overlap} {
             set block $newBlock
-            lset blocks $blockI $block
-            dict set blockSet blocks $blocks
-            lset sets $setI $blockSet
+            dict set blockSpace blocks $blockI $block
+            set sets($setI) $blockSpace
         }
         
         updateWindow $workspace $block $blockWin
