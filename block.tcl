@@ -80,22 +80,36 @@ namespace eval block {
             -width $pxW -height $pxH -window $blockFrame -tags "block"\
             -anchor nw]
         
-        grid [ttk::frame $blockFrame.nHandle    -style $style]\
+        grid [ttk::frame $blockFrame.nHandle    -style $style\
+            -cursor top_side]\
             -row 0 -column 1 -sticky nsew
-        grid [ttk::frame $blockFrame.neHandle   -style $style]\
+        grid [ttk::frame $blockFrame.neHandle   -style $style\
+            -cursor top_right_corner]\
             -row 0 -column 2 -sticky nsew
-        grid [ttk::frame $blockFrame.eHandle    -style $style]\
+        grid [ttk::frame $blockFrame.eHandle    -style $style\
+            -cursor right_side]\
             -row 1 -column 2 -sticky nsew
-        grid [ttk::frame $blockFrame.seHandle   -style $style]\
+        grid [ttk::frame $blockFrame.seHandle   -style $style\
+            -cursor bottom_right_corner]\
             -row 2 -column 2 -sticky nsew
-        grid [ttk::frame $blockFrame.sHandle    -style $style]\
+        grid [ttk::frame $blockFrame.sHandle    -style $style\
+            -cursor bottom_side]\
             -row 2 -column 1 -sticky nsew
-        grid [ttk::frame $blockFrame.swHandle   -style $style]\
+        grid [ttk::frame $blockFrame.swHandle   -style $style\
+            -cursor bottom_left_corner]\
             -row 2 -column 0 -sticky nsew
-        grid [ttk::frame $blockFrame.wHandle    -style $style]\
+        grid [ttk::frame $blockFrame.wHandle    -style $style\
+            -cursor left_side]\
             -row 1 -column 0 -sticky nsew
-        grid [ttk::frame $blockFrame.nwHandle   -style $style]\
+        grid [ttk::frame $blockFrame.nwHandle   -style $style\
+            -cursor top_left_corner]\
             -row 0 -column 0 -sticky nsew
+
+        set handles [list $blockFrame.nHandle $blockFrame.neHandle\
+            $blockFrame.eHandle $blockFrame.seHandle $blockFrame.sHandle\
+            $blockFrame.swHandle $blockFrame.wHandle $blockFrame.nwHandle]
+
+
 
         grid rowconfigure $blockFrame 0 -minsize $edgeW 
         grid rowconfigure $blockFrame 1 -weight 1
@@ -110,11 +124,40 @@ namespace eval block {
         dict set blockSpace blocks $blockctr $block
         set sets($setI) $blockSpace
 
-        bind $blockFrame <1> "block::selectWindow $workspace %X %Y;\
-            raise $blockFrame"
+        bind $blockFrame <1> "block::selectWindow $workspace $blockFrame\
+            %X %Y"
         bind $blockFrame <B1-Motion> "block::moveWindow $workspace\
             $blockWin %X %Y"
-        bind $blockFrame <B1-ButtonRelease> "block::dropWindow $setI $blockctr"
+
+        foreach handle [list $blockFrame.nwHandle $blockFrame.nHandle\
+                $blockFrame.neHandle] {
+            bind $handle <B1-Motion> "+block::resizeWindowV $workspace\
+                $blockWin %Y 1"
+        }
+
+        foreach handle [list $blockFrame.neHandle $blockFrame.eHandle\
+                $blockFrame.seHandle] {
+            bind $handle <B1-Motion> "+block::resizeWindowH $workspace\
+                $blockWin %X 0"
+        }
+
+        foreach handle [list $blockFrame.swHandle $blockFrame.sHandle\
+                $blockFrame.seHandle] {
+            bind $handle <B1-Motion> "+block::resizeWindowV $workspace\
+                $blockWin %Y 0"
+        }
+
+        foreach handle [list $blockFrame.nwHandle $blockFrame.wHandle\
+                $blockFrame.swHandle] {
+            bind $handle <B1-Motion> "+block::resizeWindowH $workspace\
+                $blockWin %X 1"
+        }
+
+        foreach frame [concat $handles $blockFrame] {
+            bind $frame <1> "block::selectWindow $workspace $blockFrame %X %Y"
+            bind $frame <B1-ButtonRelease> "block::dropWindow $setI $blockctr"
+        }
+
 
         incr blockctr
         return [expr $blockctr - 1]
@@ -147,24 +190,69 @@ namespace eval block {
         $workspace itemconfigure $blockWin -width $pxW -height $pxH
     }
 
-    proc selectWindow {workspace mx my} {
+    proc selectWindow {workspace blockFrame mx my} {
         variable gridsz
         variable x0 [$workspace canvasx $mx $gridsz]\
             y0 [$workspace canvasy $my $gridsz]
+        raise $blockFrame
+    }
+
+    proc dx {workspace mx} {
+        variable gridsz
+        variable x0
+        set x [$workspace canvasx $mx $gridsz]
+        set dx [expr $x - $x0]
+        set x0 $x
+        return $dx
+    }
+
+    proc dy {workspace my} {
+        variable gridsz
+        variable y0
+        set y [$workspace canvasy $my $gridsz]
+        set dy [expr $y - $y0]
+        set y0 $y
+        return $dy
     }
 
     proc moveWindow {workspace window mx my} {
-        variable gridsz
-        variable x0
-        variable y0
+        $workspace move $window [dx $workspace $mx] [dy $workspace $my]
+    }
 
-        set x [$workspace canvasx $mx $gridsz]
-        set y [$workspace canvasy $my $gridsz]
-        $workspace move $window\
-            [expr $x - $x0]\
-            [expr $y - $y0]
-        set x0 $x
-        set y0 $y
+    proc resizeWindowH {workspace window mx left} {
+        variable gridsz
+
+        set dx [dx $workspace $mx]
+        set w0 [$workspace itemcget $window -width]
+        if {$left} {
+            set w [expr $w0 - $dx]
+        } else {
+            set w [expr $w0 + $dx]
+        }
+        if {$w >= $gridsz} {
+            $workspace itemconfigure $window -width $w
+            if {$left} {
+                $workspace move $window $dx 0
+            }
+        }
+    }
+
+    proc resizeWindowV {workspace window my top} {
+        variable gridsz
+
+        set dy [dy $workspace $my]
+        set h0 [$workspace itemcget $window -height]
+        if {$top} {
+            set h [expr $h0 - $dy]
+        } else {
+            set h [expr $h0 + $dy]
+        }
+        if {$h >= $gridsz} {
+            $workspace itemconfigure $window -height $h
+            if {$top} {
+                $workspace move $window 0 $dy
+            }
+        }
     }
 
     proc overlap {block1 block2} {
@@ -194,9 +282,14 @@ namespace eval block {
         set blockWin [dict get $block window]
         set workspace [dict get $blockSpace ws]
         lassign [$workspace coords $blockWin] x y
-        set newx [expr int($x / $gridsz)]; set newy [expr int($y / $gridsz)]
+        set w [$workspace itemcget $blockWin -width]
+        set h [$workspace itemcget $blockWin -height]
+        set newX [expr int($x / $gridsz)]; set newY [expr int($y / $gridsz)]
+        set newW [expr int($w / $gridsz)]; set newH [expr int($h / $gridsz)]
+
         set newBlock $block
-        dict set newBlock pos [list $newx $newy]
+        dict set newBlock pos [list $newX $newY]
+        dict set newBlock dim [list $newW $newH]
 
         set overlap 0
         for {set i 0} {$i < [dict size [dict get $blockSpace blocks]]} {incr i}\
