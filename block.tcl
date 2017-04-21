@@ -1,9 +1,14 @@
 package require Tk
 
-namespace eval block {
-    namespace export createBlockSet addBlock updateScrollRegion 
 
-    variable gridsz 20 blockctr 0 setctr 0
+ttk::style configure Op.TFrame -background #40a0ff
+ttk::style configure Conduit.TFrame -background #ff9010 
+ttk::style configure ConduitEdge.TFrame -background #ffff00
+
+namespace eval block {
+    namespace export createBlockSet updateScrollRegion addOp addConduit
+
+    variable gridsz 20 blockctr 0 setctr 0 edgeW 4
     variable sets 
 
     proc createBlockSet {workspace} {
@@ -22,18 +27,47 @@ namespace eval block {
         return [expr $setctr - 1]
     }
 
-    proc addBlock {setI pos dim style} {
+    proc addOp {setI pos dim} {
+        variable sets
+
+        set blockI [newBlock $setI $pos $dim Op.TFrame]
+        set blockFrame [dict get $sets($setI) blocks $blockI frame]
+        $blockFrame configure -relief solid -borderwidth 1
+
+        return $blockI
+    }
+
+    proc addConduit {setI pos dim} {
+        variable sets
+        variable edgeW
+
+        set blockI [newBlock $setI $pos $dim Conduit.TFrame]
+        set blockFrame [dict get $sets($setI) blocks $blockI frame]
+        set sideHandles [list\
+            $blockFrame.nwHandle    $blockFrame.neHandle\
+            $blockFrame.wHandle     $blockFrame.eHandle\
+            $blockFrame.swHandle    $blockFrame.seHandle]
+
+        foreach h $sideHandles {
+            $h configure -style ConduitEdge.TFrame
+        }
+
+        return $blockI
+    }
+
+    proc newBlock {setI pos dim style} {
         variable gridsz
         variable blockctr
         variable sets
+        variable edgeW
         set blockSpace $sets($setI)
 
         set block [dict create\
                 pos     $pos\
-                dim     $dim\
-                style   $style]
+                dim     $dim]
 
         set workspace [dict get $blockSpace ws]
+        set wsParent [dict get $blockSpace wsParent]
 
         set pxX [expr [lindex $pos 0] * $gridsz]
         set pxY [expr [lindex $pos 1] * $gridsz]
@@ -41,10 +75,34 @@ namespace eval block {
         set pxH [expr [lindex $dim 1] * $gridsz]
 
         set blockFrame [ttk::frame\
-            [dict get $blockSpace wsParent].block$blockctr -style $style]
+            $wsParent.block$blockctr -style $style]
         set blockWin [$workspace create window $pxX $pxY\
             -width $pxW -height $pxH -window $blockFrame -tags "block"\
             -anchor nw]
+        
+        grid [ttk::frame $blockFrame.nHandle    -style $style]\
+            -row 0 -column 1 -sticky nsew
+        grid [ttk::frame $blockFrame.neHandle   -style $style]\
+            -row 0 -column 2 -sticky nsew
+        grid [ttk::frame $blockFrame.eHandle    -style $style]\
+            -row 1 -column 2 -sticky nsew
+        grid [ttk::frame $blockFrame.seHandle   -style $style]\
+            -row 2 -column 2 -sticky nsew
+        grid [ttk::frame $blockFrame.sHandle    -style $style]\
+            -row 2 -column 1 -sticky nsew
+        grid [ttk::frame $blockFrame.swHandle   -style $style]\
+            -row 2 -column 0 -sticky nsew
+        grid [ttk::frame $blockFrame.wHandle    -style $style]\
+            -row 1 -column 0 -sticky nsew
+        grid [ttk::frame $blockFrame.nwHandle   -style $style]\
+            -row 0 -column 0 -sticky nsew
+
+        grid rowconfigure $blockFrame 0 -minsize $edgeW 
+        grid rowconfigure $blockFrame 1 -weight 1
+        grid rowconfigure $blockFrame 2 -minsize $edgeW
+        grid columnconfigure $blockFrame 0 -minsize $edgeW
+        grid columnconfigure $blockFrame 1 -weight 1
+        grid columnconfigure $blockFrame 2 -minsize $edgeW
 
         dict set block frame $blockFrame
         dict set block window $blockWin

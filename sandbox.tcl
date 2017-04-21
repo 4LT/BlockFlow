@@ -1,9 +1,9 @@
 package require Tk
-source block.tcl
-namespace import block::*
 
 # Aqua won't allow setting of background colors
 ttk::style theme use default
+source block.tcl
+namespace import block::*
 
 option add *tearOff 0
 
@@ -27,16 +27,10 @@ grid .status -row 2 -column 0 -columnspan 2 -sticky ew
 grid rowconfigure . 0 -weight 1
 grid columnconfigure . 0 -weight 1
 
-ttk::style configure Green.TFrame -background #00c000
-ttk::style configure Blue.TFrame -background #0000ff
-ttk::style configure Magenta.TFrame -background #d000ff
-ttk::style configure Red.TFrame -background #d00000
-
 bind . <Leave> {updateScrollRegion .view.workspace}
 
 set bset [createBlockSet .view.workspace]
-addBlock $bset "0 0" {4 3} Green.TFrame
-addBlock $bset "0 4" {4 3} Blue.TFrame
-addBlock $bset "5 0" {4 3} Magenta.TFrame
+addOp $bset "0 0" {4 3} 
+addConduit $bset "1 3" {1 6}
 
 updateScrollRegion .view.workspace
