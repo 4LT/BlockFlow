@@ -1,48 +1,52 @@
-package require Tk
-
-
-ttk::style configure Op.TFrame -background #40a0ff
-ttk::style configure Conduit.TFrame -background #ff9010 
-ttk::style configure ConduitEdge.TFrame -background #ffff00
+if {[info exists block::included]} {
+    return
+}
 
 namespace eval block {
-    namespace export createBlockSet updateScrollRegion addOp addConduit
+    variable included 1
 
-    variable gridsz 20 blockctr 0 setctr 0 edgeW 4
-    variable sets 
+    namespace export createBlockSet updateScrollRegion addOp addConduit\
+        getPropBox setClickCB
 
-    proc createBlockSet {workspace} {
-        variable sets
-        variable setctr
+    package require Tk
 
-        set blockSpace [dict create ws $workspace]
-        set wsParent [regsub {\.[^\.]*$} $workspace ""]
-        if { "$wsParent" == "$workspace" || "$wsParent" == "" } {
-            error "Workspace must have a non-root parent!"
+    variable gridsz 20 blockctr -1 edgeW 4
+    variable blockSets 
+
+    ttk::style configure Op.TFrame -background #40a0ff
+    ttk::style configure Conduit.TFrame -background #ff9010 
+    ttk::style configure ConduitEdge.TFrame -background #ffff00
+
+    proc getMaster {widg} {
+        set master [regsub {\.[^\.]*$} $widg ""]
+        if { "$master" == "$widg" || "$master" == "" } {
+            error "Workspace must have a non-root master!"
         }
-        dict set blockSpace wsParent $wsParent
-        dict set blockSpace blocks [dict create]
-        set sets($setctr) $blockSpace
-        incr setctr
-        return [expr $setctr - 1]
+        return $master
     }
 
-    proc addOp {setI pos dim} {
-        variable sets
+    proc createBlockSet {workspace} {
+        variable blockSets
+        set blockSets($workspace) [dict create]
+        return $workspace
+    }
 
-        set blockI [newBlock $setI $pos $dim Op.TFrame]
-        set blockFrame [dict get $sets($setI) blocks $blockI frame]
+    proc addOp {workspace pos dim propBox} {
+        variable blockSets
+
+        set blockI [newBlock $workspace $pos $dim Op.TFrame $propBox]
+        set blockFrame [dict get $blockSets($workspace) $blockI frame]
         $blockFrame configure -relief solid -borderwidth 1
 
         return $blockI
     }
 
-    proc addConduit {setI pos dim} {
-        variable sets
+    proc addConduit {workspace pos dim propBox} {
+        variable blockSets
         variable edgeW
 
-        set blockI [newBlock $setI $pos $dim Conduit.TFrame]
-        set blockFrame [dict get $sets($setI) blocks $blockI frame]
+        set blockI [newBlock $workspace $pos $dim Conduit.TFrame $propBox]
+        set blockFrame [dict get $blockSets($workspace) $blockI frame]
         set sideHandles [list\
             $blockFrame.nwHandle    $blockFrame.neHandle\
             $blockFrame.wHandle     $blockFrame.eHandle\
@@ -55,27 +59,30 @@ namespace eval block {
         return $blockI
     }
 
-    proc newBlock {setI pos dim style} {
+    proc newBlock {workspace pos dim style propBox} {
         variable gridsz
         variable blockctr
-        variable sets
+        variable blockSets
         variable edgeW
-        set blockSpace $sets($setI)
+
+        incr blockctr
+
+        set blocks $blockSets($workspace)
 
         set block [dict create\
                 pos     $pos\
-                dim     $dim]
+                dim     $dim\
+                propBox $propBox\
+                clickCB ";"]
 
-        set workspace [dict get $blockSpace ws]
-        set wsParent [dict get $blockSpace wsParent]
+        set wsMaster [getMaster $workspace]
 
         set pxX [expr [lindex $pos 0] * $gridsz]
         set pxY [expr [lindex $pos 1] * $gridsz]
         set pxW [expr [lindex $dim 0] * $gridsz]
         set pxH [expr [lindex $dim 1] * $gridsz]
 
-        set blockFrame [ttk::frame\
-            $wsParent.block$blockctr -style $style]
+        set blockFrame [ttk::frame $wsMaster.block$blockctr -style $style]
         set blockWin [$workspace create window $pxX $pxY\
             -width $pxW -height $pxH -window $blockFrame -tags "block"\
             -anchor nw]
@@ -109,8 +116,6 @@ namespace eval block {
             $blockFrame.eHandle $blockFrame.seHandle $blockFrame.sHandle\
             $blockFrame.swHandle $blockFrame.wHandle $blockFrame.nwHandle]
 
-
-
         grid rowconfigure $blockFrame 0 -minsize $edgeW 
         grid rowconfigure $blockFrame 1 -weight 1
         grid rowconfigure $blockFrame 2 -minsize $edgeW
@@ -121,8 +126,8 @@ namespace eval block {
         dict set block frame $blockFrame
         dict set block window $blockWin
 
-        dict set blockSpace blocks $blockctr $block
-        set sets($setI) $blockSpace
+        dict set blocks $blockctr $block
+        set blockSets($workspace) $blocks
 
         bind $blockFrame <1> "block::selectWindow $workspace $blockFrame\
             %X %Y"
@@ -155,15 +160,15 @@ namespace eval block {
 
         foreach frame [concat $handles $blockFrame] {
             bind $frame <1> "block::selectWindow $workspace $blockFrame %X %Y"
-            bind $frame <B1-ButtonRelease> "block::dropWindow $setI $blockctr"
+            bind $frame <1> "+block::onClick $workspace $blockctr"
+            bind $frame <B1-ButtonRelease>\
+                "block::dropWindow $workspace $blockctr"
         }
 
-
-        incr blockctr
-        return [expr $blockctr - 1]
+        return $blockctr
     }
 
-    proc updateScrollRegion { workspace } {
+    proc updateScrollRegion {workspace} {
         variable gridsz
 
         set bbox [$workspace bbox "block"]
@@ -273,14 +278,13 @@ namespace eval block {
         }
     }
 
-    proc dropWindow {setI blockI} {
-        variable sets
+    proc dropWindow {workspace blockI} {
         variable gridsz
+        variable blockSets
 
-        set blockSpace $sets($setI)
-        set block [dict get $blockSpace blocks $blockI]
+        set blocks $blockSets($workspace)
+        set block [dict get $blocks $blockI]
         set blockWin [dict get $block window]
-        set workspace [dict get $blockSpace ws]
         lassign [$workspace coords $blockWin] x y
         set w [$workspace itemcget $blockWin -width]
         set h [$workspace itemcget $blockWin -height]
@@ -292,10 +296,8 @@ namespace eval block {
         dict set newBlock dim [list $newW $newH]
 
         set overlap 0
-        for {set i 0} {$i < [dict size [dict get $blockSpace blocks]]} {incr i}\
-        {
-            if {$i != $blockI && [overlap $newBlock\
-                    [dict get $blockSpace blocks $i]]} {
+        for {set i 0} {$i < [dict size $blocks]} {incr i} {
+            if {$i != $blockI && [overlap $newBlock [dict get $blocks $i]]} {
                 set overlap 1
                 break
             }
@@ -303,11 +305,26 @@ namespace eval block {
 
         if {!$overlap} {
             set block $newBlock
-            dict set blockSpace blocks $blockI $block
-            set sets($setI) $blockSpace
+            dict set blocks $blockI $block
+            set blockSets($workspace) $blocks
         }
         
         updateWindow $workspace $block $blockWin
         updateScrollRegion $workspace
+    }
+
+    proc getPropBox {workspace boxI} {
+        variable blockSets
+        return [dict get $blockSets($workspace) $boxI propBox]
+    }
+
+    proc setClickCB {workspace blockI cbScript} {
+        variable blockSets
+        dict set blockSets($workspace) $blockI clickCB $cbScript
+    }
+
+    proc onClick {workspace blockI} {
+        variable blockSets
+        eval [dict get $blockSets($workspace) $blockI clickCB]
     }
 }
