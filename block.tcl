@@ -110,7 +110,6 @@ namespace eval block {
 
         foreach handle [concat $handles $blockFrame] {
             bindtags $handle [linsert [bindtags $handle] 1 block$blockctr]
-            puts [bindtags $handle]
         }
 
         grid rowconfigure $blockFrame 0 -minsize $edgeW 
