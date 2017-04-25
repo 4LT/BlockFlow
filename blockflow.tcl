@@ -18,15 +18,15 @@ tk::canvas .view.workspace -xscrollcommand {.workscrollx set}\
 ttk::frame .fill
 ttk::scrollbar .workscrollx -orient horizontal -command {.view.workspace xview}
 ttk::scrollbar .workscrolly -orient vertical -command {.view.workspace yview}
-ttk::panedwindow .controls
+ttk::panedwindow .controls -width 280
 ttk::frame .controls.properties -padding "4 2 4 0"
 ttk::frame .controls.blocklist -padding "4 2 4 0"
 ttk::label .controls.properties.label -text "Properties"
 ttk::label .controls.blocklist.label -text "Blocks"
 ttk::label .status -text "Status Bar"
 
-ttk::frame .controls.properties.container
-tk::listbox .controls.blocklist.list -font PropertyKey
+ttk::frame .controls.properties.container -height 240
+tk::listbox .controls.blocklist.list -font PropertyKey -relief sunken
 
 grid .view -row 0 -column 0 -sticky nsew
 pack .view.workspace -expand 1 -fill both
@@ -36,7 +36,7 @@ grid .workscrolly -row 0 -column 1 -sticky ns
 grid .controls -row 0 -column 2 -rowspan 2 -sticky nsew -ipadx 4
     .controls add .controls.properties
         pack .controls.properties.label -anchor w
-        pack .controls.properties.container
+        pack .controls.properties.container -fill both -expand 1
     .controls add .controls.blocklist
         pack .controls.blocklist.label -anchor w
         pack .controls.blocklist.list -fill both -expand 1
@@ -49,7 +49,7 @@ grid columnconfigure . 0 -weight 1
 
 .controls sashpos 0 80
 
-.controls.blocklist.list insert end Conduit Add Sub Mul Div
+.controls.blocklist.list insert end Conduit Send 
 
 bind . <Leave> {updateScrollRegion .view.workspace}
 
@@ -66,6 +66,7 @@ proc setPropertiesSlave {newSlave} {
         pack forget $oldSlave
     }
     pack $newSlave -fill both -expand 1
+    focus $newSlave
 }
 
 block::setClickCB .view.workspace $sender "setPropertiesSlave $sendBlockPBox"

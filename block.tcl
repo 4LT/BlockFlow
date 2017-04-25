@@ -13,17 +13,9 @@ namespace eval block {
     variable gridsz 20 blockctr -1 edgeW 4
     variable blockSets 
 
-    ttk::style configure Op.TFrame -background #40a0ff
+    ttk::style configure Op.TFrame -background #80c8ff
     ttk::style configure Conduit.TFrame -background #ff9010 
     ttk::style configure ConduitEdge.TFrame -background #ffff00
-
-    proc getMaster {widg} {
-        set master [regsub {\.[^\.]*$} $widg ""]
-        if { "$master" == "$widg" || "$master" == "" } {
-            error "Workspace must have a non-root master!"
-        }
-        return $master
-    }
 
     proc createBlockSet {workspace} {
         variable blockSets
@@ -75,14 +67,14 @@ namespace eval block {
                 propBox $propBox\
                 clickCB ";"]
 
-        set wsMaster [getMaster $workspace]
+        set wsParent [winfo parent $workspace]
 
         set pxX [expr [lindex $pos 0] * $gridsz]
         set pxY [expr [lindex $pos 1] * $gridsz]
         set pxW [expr [lindex $dim 0] * $gridsz]
         set pxH [expr [lindex $dim 1] * $gridsz]
 
-        set blockFrame [ttk::frame $wsMaster.block$blockctr -style $style]
+        set blockFrame [ttk::frame $wsParent.block$blockctr -style $style]
         set blockWin [$workspace create window $pxX $pxY\
             -width $pxW -height $pxH -window $blockFrame -tags "block"\
             -anchor nw]
@@ -116,6 +108,11 @@ namespace eval block {
             $blockFrame.eHandle $blockFrame.seHandle $blockFrame.sHandle\
             $blockFrame.swHandle $blockFrame.wHandle $blockFrame.nwHandle]
 
+        foreach handle [concat $handles $blockFrame] {
+            bindtags $handle [linsert [bindtags $handle] 1 block$blockctr]
+            puts [bindtags $handle]
+        }
+
         grid rowconfigure $blockFrame 0 -minsize $edgeW 
         grid rowconfigure $blockFrame 1 -weight 1
         grid rowconfigure $blockFrame 2 -minsize $edgeW
@@ -128,11 +125,6 @@ namespace eval block {
 
         dict set blocks $blockctr $block
         set blockSets($workspace) $blocks
-
-        bind $blockFrame <1> "block::selectWindow $workspace $blockFrame\
-            %X %Y"
-        bind $blockFrame <B1-Motion> "block::moveWindow $workspace\
-            $blockWin %X %Y"
 
         foreach handle [list $blockFrame.nwHandle $blockFrame.nHandle\
                 $blockFrame.neHandle] {
@@ -158,12 +150,13 @@ namespace eval block {
                 $blockWin %X 1"
         }
 
-        foreach frame [concat $handles $blockFrame] {
-            bind $frame <1> "block::selectWindow $workspace $blockFrame %X %Y"
-            bind $frame <1> "+block::onClick $workspace $blockctr"
-            bind $frame <B1-ButtonRelease>\
-                "block::dropWindow $workspace $blockctr"
-        }
+        bind block$blockctr <1> "block::selectWindow $workspace $blockFrame\
+            %X %Y"
+        bind $blockFrame <B1-Motion> "block::moveWindow $workspace\
+            $blockWin %X %Y"
+        bind block$blockctr <1> "+block::onClick $workspace $blockctr"
+        bind block$blockctr <B1-ButtonRelease>\
+            "block::dropWindow $workspace $blockctr"
 
         return $blockctr
     }
