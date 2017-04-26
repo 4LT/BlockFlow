@@ -57,8 +57,8 @@ createBlockSet .view.workspace
 set sendBlockPBox [createPropertiesBox .controls.properties.container\
     "Destination"]
 set conduitPBox [createPropertiesBox .controls.properties.container ""]
-set sender [addOp .view.workspace "0 0" {4 3} sendBlockPBox]
-set conduit [addConduit .view.workspace "1 3" {1 6} conduitPBox]
+set sender [addOp .view.workspace "0 0" {3 2} sendBlockPBox send]
+set conduit [addConduit .view.workspace "1 2" {1 1} conduitPBox]
 
 proc setPropertiesSlave {newSlave} {
     set slaves [pack slaves .controls.properties.container]

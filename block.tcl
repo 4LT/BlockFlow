@@ -13,7 +13,8 @@ namespace eval block {
     variable gridsz 20 blockctr -1 edgeW 4
     variable blockSets 
 
-    ttk::style configure Op.TFrame -background #80c8ff
+    ttk::style configure Op.TFrame -background #80c8ff 
+    ttk::style configure Op.TLabel -background #80c8ff
     ttk::style configure Conduit.TFrame -background #ff9010 
     ttk::style configure ConduitEdge.TFrame -background #ffff00
 
@@ -23,12 +24,18 @@ namespace eval block {
         return $workspace
     }
 
-    proc addOp {workspace pos dim propBox} {
+    proc addOp {workspace pos dim propBox labelText} {
         variable blockSets
 
         set blockI [newBlock $workspace $pos $dim Op.TFrame $propBox]
         set blockFrame [dict get $blockSets($workspace) $blockI frame]
         $blockFrame configure -relief solid -borderwidth 1
+
+        grid [ttk::label ${blockFrame}.label -text $labelText -style Op.TLabel]\
+            -row 1 -column 1
+
+        bindtags ${blockFrame}.label\
+            [linsert [bindtags ${blockFrame}.label] 1 $blockFrame block$blockI]
 
         return $blockI
     }
@@ -64,6 +71,7 @@ namespace eval block {
         set block [dict create\
                 pos     $pos\
                 dim     $dim\
+                minDim  $dim\
                 propBox $propBox\
                 clickCB ";"]
 
@@ -128,25 +136,25 @@ namespace eval block {
         foreach handle [list $blockFrame.nwHandle $blockFrame.nHandle\
                 $blockFrame.neHandle] {
             bind $handle <B1-Motion> "+block::resizeWindowV $workspace\
-                $blockWin %Y 1"
+                $blockctr %Y 1"
         }
 
         foreach handle [list $blockFrame.neHandle $blockFrame.eHandle\
                 $blockFrame.seHandle] {
             bind $handle <B1-Motion> "+block::resizeWindowH $workspace\
-                $blockWin %X 0"
+                $blockctr %X 0"
         }
 
         foreach handle [list $blockFrame.swHandle $blockFrame.sHandle\
                 $blockFrame.seHandle] {
             bind $handle <B1-Motion> "+block::resizeWindowV $workspace\
-                $blockWin %Y 0"
+                $blockctr %Y 0"
         }
 
         foreach handle [list $blockFrame.nwHandle $blockFrame.wHandle\
                 $blockFrame.swHandle] {
             bind $handle <B1-Motion> "+block::resizeWindowH $workspace\
-                $blockWin %X 1"
+                $blockctr %X 1"
         }
 
         bind block$blockctr <1> "block::selectWindow $workspace $blockFrame\
@@ -216,8 +224,13 @@ namespace eval block {
         $workspace move $window [dx $workspace $mx] [dy $workspace $my]
     }
 
-    proc resizeWindowH {workspace window mx left} {
+    proc resizeWindowH {workspace blockI mx left} {
         variable gridsz
+        variable blockSets
+
+        set block [dict get $blockSets($workspace) $blockI]
+        set window [dict get $block window]
+        set minW [lindex [dict get $block minDim] 0]
 
         set dx [dx $workspace $mx]
         set w0 [$workspace itemcget $window -width]
@@ -226,7 +239,7 @@ namespace eval block {
         } else {
             set w [expr $w0 + $dx]
         }
-        if {$w >= $gridsz} {
+        if {$w >= [expr $gridsz * $minW]} {
             $workspace itemconfigure $window -width $w
             if {$left} {
                 $workspace move $window $dx 0
@@ -234,8 +247,13 @@ namespace eval block {
         }
     }
 
-    proc resizeWindowV {workspace window my top} {
+    proc resizeWindowV {workspace blockI my top} {
         variable gridsz
+        variable blockSets
+
+        set block [dict get $blockSets($workspace) $blockI]
+        set window [dict get $block window]
+        set minH [lindex [dict get $block minDim] 1]
 
         set dy [dy $workspace $my]
         set h0 [$workspace itemcget $window -height]
@@ -244,7 +262,7 @@ namespace eval block {
         } else {
             set h [expr $h0 + $dy]
         }
-        if {$h >= $gridsz} {
+        if {$h >= [expr $gridsz * $minH]} {
             $workspace itemconfigure $window -height $h
             if {$top} {
                 $workspace move $window 0 $dy
