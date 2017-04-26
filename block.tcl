@@ -24,10 +24,10 @@ namespace eval block {
         return $workspace
     }
 
-    proc addOp {workspace pos dim propBox labelText} {
+    proc addOp {workspace pos minDim dim propBox labelText} {
         variable blockSets
 
-        set blockI [newBlock $workspace $pos $dim Op.TFrame $propBox]
+        set blockI [newBlock $workspace $pos $minDim $dim Op.TFrame $propBox]
         set blockFrame [dict get $blockSets($workspace) $blockI frame]
         $blockFrame configure -relief solid -borderwidth 1
 
@@ -44,7 +44,7 @@ namespace eval block {
         variable blockSets
         variable edgeW
 
-        set blockI [newBlock $workspace $pos $dim Conduit.TFrame $propBox]
+        set blockI [newBlock $workspace $pos {1 1} $dim Conduit.TFrame $propBox]
         set blockFrame [dict get $blockSets($workspace) $blockI frame]
         set sideHandles [list\
             $blockFrame.nwHandle    $blockFrame.neHandle\
@@ -58,7 +58,7 @@ namespace eval block {
         return $blockI
     }
 
-    proc newBlock {workspace pos dim style propBox} {
+    proc newBlock {workspace pos minDim dim style propBox} {
         variable gridsz
         variable blockctr
         variable blockSets
@@ -71,7 +71,7 @@ namespace eval block {
         set block [dict create\
                 pos     $pos\
                 dim     $dim\
-                minDim  $dim\
+                minDim  $minDim\
                 propBox $propBox\
                 clickCB ";"]
 
