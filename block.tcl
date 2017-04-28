@@ -13,10 +13,14 @@ namespace eval block {
     variable gridsz 20 blockctr -1 edgeW 4
     variable blockSets 
 
-    ttk::style configure Op.TFrame -background #80c8ff 
+    ttk::style configure Op.TFrame -background #80c8ff
     ttk::style configure Op.TLabel -background #80c8ff
     ttk::style configure Conduit.TFrame -background #ff9010 
-    ttk::style configure ConduitEdge.TFrame -background #ffff00
+    ttk::style configure ConduitEdge.TFrame -background #b04000
+
+    ttk::style configure SelFrame.TFrame -background #c0ffc0
+    ttk::style configure SelLabel.TLabel -background #c0ffc0
+    ttk::style configure SelEdge.TFrame -background #00c000
 
     proc createBlockSet {workspace} {
         variable blockSets
@@ -30,6 +34,7 @@ namespace eval block {
         set blockI [newBlock $workspace $pos $minDim $dim Op.TFrame $propBox]
         set blockFrame [dict get $blockSets($workspace) $blockI frame]
         $blockFrame configure -relief solid -borderwidth 1
+        dict set blockSets($workspace) $blockI blockType "Op"
 
         grid [ttk::label ${blockFrame}.label -text $labelText -style Op.TLabel]\
             -row 1 -column 1
@@ -46,11 +51,13 @@ namespace eval block {
 
         set blockI [newBlock $workspace $pos {1 1} $dim Conduit.TFrame $propBox]
         set blockFrame [dict get $blockSets($workspace) $blockI frame]
+        dict set blockSets($workspace) $blockI blockType "Conduit"
         set sideHandles [list\
             $blockFrame.nwHandle    $blockFrame.neHandle\
             $blockFrame.wHandle     $blockFrame.eHandle\
             $blockFrame.swHandle    $blockFrame.seHandle]
 
+        dict set blockSets($workspace) $blockI sideHandles $sideHandles
         foreach h $sideHandles {
             $h configure -style ConduitEdge.TFrame
         }
@@ -157,7 +164,7 @@ namespace eval block {
                 $blockctr %X 1"
         }
 
-        bind block$blockctr <1> "block::selectWindow $workspace $blockFrame\
+        bind block$blockctr <1> "block::selectWindow $workspace $blockctr\
             %X %Y"
         bind $blockFrame <B1-Motion> "block::moveWindow $workspace\
             $blockWin %X %Y"
@@ -195,10 +202,30 @@ namespace eval block {
         $workspace itemconfigure $blockWin -width $pxW -height $pxH
     }
 
-    proc selectWindow {workspace blockFrame mx my} {
+    proc selectWindow {workspace blockI mx my} {
         variable gridsz
         variable x0 [$workspace canvasx $mx $gridsz]\
             y0 [$workspace canvasy $my $gridsz]
+        variable blockSets
+
+        set block [dict get $blockSets($workspace) $blockI]
+        set blockFrame [dict get $block frame]
+
+        $blockFrame configure -style SelFrame.TFrame
+        foreach child [winfo children $blockFrame] {
+            switch [winfo class $child] {
+                TFrame {
+                    $child configure -style SelFrame.TFrame
+                } TLabel {
+                    $child configure -style SelLabel.TLabel
+                }
+            }
+        }
+        if {[dict get $block blockType] == "Conduit"} {
+            foreach h [dict get $block sideHandles] {
+                $h configure -style SelEdge.TFrame
+            }
+        }
         raise $blockFrame
     }
 
