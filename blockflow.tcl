@@ -5,7 +5,7 @@ ttk::style theme use default
 source propertiesbox.tcl
 source block.tcl
 namespace import propbox::*
-namespace import block::*
+namespace import Block::*
 
 option add *tearOff 0
 
@@ -53,7 +53,6 @@ grid columnconfigure . 0 -weight 1
 
 bind . <Leave> {updateScrollRegion .view.workspace}
 
-createBlockSet .view.workspace
 set sendBlockPBox [createPropertiesBox .controls.properties.container\
     "Destination"]
 set conduitPBox [createPropertiesBox .controls.properties.container ""]
@@ -69,7 +68,7 @@ proc setPropertiesSlave {newSlave} {
     focus $newSlave
 }
 
-block::setClickCB .view.workspace $sender "setPropertiesSlave $sendBlockPBox"
-block::setClickCB .view.workspace $conduit "setPropertiesSlave $conduitPBox"
+Block::setClickCB $sender "setPropertiesSlave $sendBlockPBox"
+Block::setClickCB $conduit "setPropertiesSlave $conduitPBox"
 
 updateScrollRegion .view.workspace

@@ -1,8 +1,8 @@
-if {[info exists block::included]} {
+if {[info exists ::Block::included]} {
     return
 }
 
-namespace eval block {
+namespace eval ::Block {
     variable included 1
 
     namespace export createBlockSet updateScrollRegion addOp addConduit\
@@ -10,8 +10,8 @@ namespace eval block {
 
     package require Tk
 
-    variable gridsz 20 blockctr -1 edgeW 4
-    variable blockSets 
+    variable gridsz 20 blockctr -1 edgeW 4 selected [list]
+    variable blockSets
 
     ttk::style configure Op.TFrame -background #80c8ff
     ttk::style configure Op.TLabel -background #80c8ff
@@ -22,47 +22,40 @@ namespace eval block {
     ttk::style configure SelLabel.TLabel -background #c0ffc0
     ttk::style configure SelEdge.TFrame -background #00c000
 
-    proc createBlockSet {workspace} {
-        variable blockSets
-        set blockSets($workspace) [dict create]
-        return $workspace
-    }
-
     proc addOp {workspace pos minDim dim propBox labelText} {
-        variable blockSets
 
-        set blockI [newBlock $workspace $pos $minDim $dim Op.TFrame $propBox]
-        set blockFrame [dict get $blockSets($workspace) $blockI frame]
-        $blockFrame configure -relief solid -borderwidth 1
-        dict set blockSets($workspace) $blockI blockType "Op"
+        set block [newBlock $workspace $pos $minDim $dim Op.TFrame $propBox]
+        set ${block}::type "Op"
+        set blockFrame [subst $${block}::frame]
+        $blockFrame  configure -relief solid -borderwidth 1
 
-        grid [ttk::label ${blockFrame}.label -text $labelText -style Op.TLabel]\
-            -row 1 -column 1
+        grid [ttk::label ${blockFrame}.label -text $labelText\
+            -style Op.TLabel] -row 1 -column 1
 
         bindtags ${blockFrame}.label\
-            [linsert [bindtags ${blockFrame}.label] 1 $blockFrame block$blockI]
+            [linsert [bindtags ${blockFrame}.label] 1\
+            $blockFrame [subst $${block}::tag]]
 
-        return $blockI
+        return $block
     }
 
     proc addConduit {workspace pos dim propBox} {
-        variable blockSets
         variable edgeW
 
-        set blockI [newBlock $workspace $pos {1 1} $dim Conduit.TFrame $propBox]
-        set blockFrame [dict get $blockSets($workspace) $blockI frame]
-        dict set blockSets($workspace) $blockI blockType "Conduit"
+        set block [newBlock $workspace $pos {1 1} $dim Conduit.TFrame $propBox]
+        set ${block}::type "Conduit"
+        set blockFrame [subst $${block}::frame]
         set sideHandles [list\
             $blockFrame.nwHandle    $blockFrame.neHandle\
             $blockFrame.wHandle     $blockFrame.eHandle\
             $blockFrame.swHandle    $blockFrame.seHandle]
 
-        dict set blockSets($workspace) $blockI sideHandles $sideHandles
+        set ${block}::sideHandles $sideHandles
         foreach h $sideHandles {
             $h configure -style ConduitEdge.TFrame
         }
 
-        return $blockI
+        return $block
     }
 
     proc newBlock {workspace pos minDim dim style propBox} {
@@ -72,15 +65,6 @@ namespace eval block {
         variable edgeW
 
         incr blockctr
-
-        set blocks $blockSets($workspace)
-
-        set block [dict create\
-                pos     $pos\
-                dim     $dim\
-                minDim  $minDim\
-                propBox $propBox\
-                clickCB ";"]
 
         set wsParent [winfo parent $workspace]
 
@@ -93,6 +77,29 @@ namespace eval block {
         set blockWin [$workspace create window $pxX $pxY\
             -width $pxW -height $pxH -window $blockFrame -tags "block"\
             -anchor nw]
+
+        set blockNs [namespace current]::instance$blockctr
+
+        set blockTag block$blockctr
+        namespace eval $blockNs [subst {
+            variable\
+                tag         "$blockTag"\
+                type        {}\
+                ws          "$workspace"\
+                pos         "$pos"\
+                dim         "$dim"\
+                minDim      "$minDim"\
+                propBox     "$propBox"\
+                clickCB     {;}\
+                frame       "$blockFrame"\
+                win         "$blockWin"
+        }] 
+
+        if {[info exists blockSets($workspace)]} {
+            lappend blockSets($workspace) $blockNs
+        } else {
+            set blockSets($workspace) [list $blockNs]
+        }
         
         grid [ttk::frame $blockFrame.nHandle    -style $style\
             -cursor top_side]\
@@ -124,7 +131,7 @@ namespace eval block {
             $blockFrame.swHandle $blockFrame.wHandle $blockFrame.nwHandle]
 
         foreach handle [concat $handles $blockFrame] {
-            bindtags $handle [linsert [bindtags $handle] 1 block$blockctr]
+            bindtags $handle [linsert [bindtags $handle] 1 $blockTag]
         }
 
         grid rowconfigure $blockFrame 0 -minsize $edgeW 
@@ -134,45 +141,32 @@ namespace eval block {
         grid columnconfigure $blockFrame 1 -weight 1
         grid columnconfigure $blockFrame 2 -minsize $edgeW
 
-        dict set block frame $blockFrame
-        dict set block window $blockWin
-
-        dict set blocks $blockctr $block
-        set blockSets($workspace) $blocks
-
         foreach handle [list $blockFrame.nwHandle $blockFrame.nHandle\
                 $blockFrame.neHandle] {
-            bind $handle <B1-Motion> "+block::resizeWindowV $workspace\
-                $blockctr %Y 1"
+            bind $handle <B1-Motion> "+::Block::resizeWindowV $blockNs %Y 1"
         }
 
         foreach handle [list $blockFrame.neHandle $blockFrame.eHandle\
                 $blockFrame.seHandle] {
-            bind $handle <B1-Motion> "+block::resizeWindowH $workspace\
-                $blockctr %X 0"
+            bind $handle <B1-Motion> "+::Block::resizeWindowH $blockNs %X 0"
         }
 
         foreach handle [list $blockFrame.swHandle $blockFrame.sHandle\
                 $blockFrame.seHandle] {
-            bind $handle <B1-Motion> "+block::resizeWindowV $workspace\
-                $blockctr %Y 0"
+            bind $handle <B1-Motion> "+::Block::resizeWindowV $blockNs %Y 0"
         }
 
         foreach handle [list $blockFrame.nwHandle $blockFrame.wHandle\
                 $blockFrame.swHandle] {
-            bind $handle <B1-Motion> "+block::resizeWindowH $workspace\
-                $blockctr %X 1"
+            bind $handle <B1-Motion> "+::Block::resizeWindowH $blockNs %X 1"
         }
 
-        bind block$blockctr <1> "block::selectWindow $workspace $blockctr\
-            %X %Y"
-        bind $blockFrame <B1-Motion> "block::moveWindow $workspace\
-            $blockWin %X %Y"
-        bind block$blockctr <1> "+block::onClick $workspace $blockctr"
-        bind block$blockctr <B1-ButtonRelease>\
-            "block::dropWindow $workspace $blockctr"
+        bind $blockTag <1> "::Block::selectWindow $blockNs %X %Y"
+        bind $blockFrame <B1-Motion> "::Block::moveWindow $blockNs %X %Y"
+        bind $blockTag <1> "+::Block::onClick $blockNs"
+        bind $blockTag <B1-ButtonRelease> "::Block::dropWindow $blockNs"
 
-        return $blockctr
+        return $blockNs
     }
 
     proc updateScrollRegion {workspace} {
@@ -188,28 +182,29 @@ namespace eval block {
         $workspace configure -scrollregion $bbox
     }
 
-    proc updateWindow {workspace block blockWin} {
+    proc updateWindow {block} {
         variable gridsz
 
-        lassign [dict get $block pos] x y
-        lassign [dict get $block dim] w h
+        lassign [subst $${block}::pos] x y
+        lassign [subst $${block}::dim] w h
         set pxX [expr $x * $gridsz]
         set pxY [expr $y * $gridsz]
         set pxW [expr $w * $gridsz]
         set pxH [expr $h * $gridsz]
         
+        set workspace [subst $${block}::ws]
+        set blockWin [subst $${block}::win]
         $workspace coords $blockWin $pxX $pxY
         $workspace itemconfigure $blockWin -width $pxW -height $pxH
     }
 
-    proc selectWindow {workspace blockI mx my} {
+    proc selectWindow {block mx my} {
         variable gridsz
+        set workspace [subst $${block}::ws]
         variable x0 [$workspace canvasx $mx $gridsz]\
             y0 [$workspace canvasy $my $gridsz]
-        variable blockSets
 
-        set block [dict get $blockSets($workspace) $blockI]
-        set blockFrame [dict get $block frame]
+        set blockFrame [subst $${block}::frame]
 
         $blockFrame configure -style SelFrame.TFrame
         foreach child [winfo children $blockFrame] {
@@ -221,8 +216,8 @@ namespace eval block {
                 }
             }
         }
-        if {[dict get $block blockType] == "Conduit"} {
-            foreach h [dict get $block sideHandles] {
+        if {[subst $${block}::type] == "Conduit"} {
+            foreach h [subst $${block}::sideHandles] {
                 $h configure -style SelEdge.TFrame
             }
         }
@@ -247,65 +242,63 @@ namespace eval block {
         return $dy
     }
 
-    proc moveWindow {workspace window mx my} {
-        $workspace move $window [dx $workspace $mx] [dy $workspace $my]
+    proc moveWindow {block mx my} {
+        set workspace [subst $${block}::ws]
+        set blockWin [subst $${block}::win]
+        $workspace move $blockWin [dx $workspace $mx] [dy $workspace $my]
     }
 
-    proc resizeWindowH {workspace blockI mx left} {
+    proc resizeWindowH {block mx left} {
         variable gridsz
-        variable blockSets
 
-        set block [dict get $blockSets($workspace) $blockI]
-        set window [dict get $block window]
-        set minW [lindex [dict get $block minDim] 0]
+        set workspace [subst $${block}::ws]
+        set blockWin [subst $${block}::win]
+        set minW [lindex [subst $${block}::minDim] 0]
 
         set dx [dx $workspace $mx]
-        set w0 [$workspace itemcget $window -width]
+        set w0 [$workspace itemcget $blockWin -width]
         if {$left} {
             set w [expr $w0 - $dx]
         } else {
             set w [expr $w0 + $dx]
         }
         if {$w >= [expr $gridsz * $minW]} {
-            $workspace itemconfigure $window -width $w
+            $workspace itemconfigure $blockWin -width $w
             if {$left} {
-                $workspace move $window $dx 0
+                $workspace move $blockWin $dx 0
             }
         }
     }
 
-    proc resizeWindowV {workspace blockI my top} {
+    proc resizeWindowV {block my top} {
         variable gridsz
-        variable blockSets
 
-        set block [dict get $blockSets($workspace) $blockI]
-        set window [dict get $block window]
-        set minH [lindex [dict get $block minDim] 1]
+        set workspace [subst $${block}::ws]
+        set blockWin [subst $${block}::win]
+        set minH [lindex [subst $${block}::minDim] 1]
 
         set dy [dy $workspace $my]
-        set h0 [$workspace itemcget $window -height]
+        set h0 [$workspace itemcget $blockWin -height]
         if {$top} {
             set h [expr $h0 - $dy]
         } else {
             set h [expr $h0 + $dy]
         }
         if {$h >= [expr $gridsz * $minH]} {
-            $workspace itemconfigure $window -height $h
+            $workspace itemconfigure $blockWin -height $h
             if {$top} {
-                $workspace move $window 0 $dy
+                $workspace move $blockWin 0 $dy
             }
         }
     }
 
-    proc overlap {block1 block2} {
-        lassign [dict get $block1 pos] minX1 minY1
-        lassign [dict get $block1 dim] w h
-        set maxX1 [expr $minX1 + $w - 1]
-        set maxY1 [expr $minY1 + $h - 1]
-        lassign [dict get $block2 pos] minX2 minY2
-        lassign [dict get $block2 dim] w h
-        set maxX2 [expr $minX2 + $w - 1]
-        set maxY2 [expr $minY2 + $h - 1]
+    proc overlap {block1 minX2 minY2 w2 h2} {
+        lassign [subst $${block1}::pos] minX1 minY1
+        lassign [subst $${block1}::dim] w1 h1
+        set maxX1 [expr $minX1 + $w1 - 1]
+        set maxY1 [expr $minY1 + $h1 - 1]
+        set maxX2 [expr $minX2 + $w2 - 1]
+        set maxY2 [expr $minY2 + $h2 - 1]
 
         if {    $minX1 <= $maxX2 && $maxX1 >= $minX2 &&\
                 $minY1 <= $maxY2 && $maxY1 >= $minY2    } {
@@ -315,53 +308,45 @@ namespace eval block {
         }
     }
 
-    proc dropWindow {workspace blockI} {
+    proc dropWindow {block} {
         variable gridsz
         variable blockSets
 
-        set blocks $blockSets($workspace)
-        set block [dict get $blocks $blockI]
-        set blockWin [dict get $block window]
+        set workspace [subst $${block}::ws]
+        set blockWin [subst $${block}::win]
+
         lassign [$workspace coords $blockWin] x y
         set w [$workspace itemcget $blockWin -width]
         set h [$workspace itemcget $blockWin -height]
-        set newX [expr int($x / $gridsz)]; set newY [expr int($y / $gridsz)]
-        set newW [expr int($w / $gridsz)]; set newH [expr int($h / $gridsz)]
-
-        set newBlock $block
-        dict set newBlock pos [list $newX $newY]
-        dict set newBlock dim [list $newW $newH]
+        set gridX [expr int($x / $gridsz)]; set gridY [expr int($y / $gridsz)]
+        set gridW [expr int($w / $gridsz)]; set gridH [expr int($h / $gridsz)]
 
         set overlap 0
-        for {set i 0} {$i < [dict size $blocks]} {incr i} {
-            if {$i != $blockI && [overlap $newBlock [dict get $blocks $i]]} {
+        foreach b $blockSets($workspace) {
+            if {$b != $block && [overlap $b $gridX $gridY $gridW $gridH]} {
                 set overlap 1
                 break
             }
         }
 
         if {!$overlap} {
-            set block $newBlock
-            dict set blocks $blockI $block
-            set blockSets($workspace) $blocks
+            set ${block}::pos [list $gridX $gridY]
+            set ${block}::dim [list $gridW $gridH]
         }
         
-        updateWindow $workspace $block $blockWin
+        updateWindow $block 
         updateScrollRegion $workspace
     }
 
-    proc getPropBox {workspace boxI} {
-        variable blockSets
-        return [dict get $blockSets($workspace) $boxI propBox]
+    proc getPropBox {block} {
+        return [subst $${block}::propBox]
     }
 
-    proc setClickCB {workspace blockI cbScript} {
-        variable blockSets
-        dict set blockSets($workspace) $blockI clickCB $cbScript
+    proc setClickCB {block cbScript} {
+        set ${block}::clickCB $cbScript 
     }
 
-    proc onClick {workspace blockI} {
-        variable blockSets
-        eval [dict get $blockSets($workspace) $blockI clickCB]
+    proc onClick {block} {
+        eval [subst $${block}::clickCB]
     }
 }
