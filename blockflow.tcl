@@ -1,7 +1,5 @@
 package require Tk
 
-# Aqua won't allow setting of background colors
-ttk::style theme use default
 source propertiesbox.tcl
 source block.tcl
 namespace import propbox::*
